@@ -40,6 +40,7 @@ interface CalculationResult {
   ogtt: MilestoneDates;
   us3: MilestoneDates;
   checkups: CheckupDate[];
+  isFuture: boolean;
 }
 
 const STAGES: Stage[] = [
@@ -60,6 +61,7 @@ export default function Home() {
   const [dateInput, setDateInput] = useState<string>('');
   const [result, setResult] = useState<CalculationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [showAllWeeks, setShowAllWeeks] = useState<boolean>(false);
   const [showTimelineMobile, setShowTimelineMobile] = useState<boolean>(false);
 
@@ -71,6 +73,7 @@ export default function Home() {
 
   const calculate = (inputVal: string, currentMode: 'period' | 'dueDate') => {
     setError(null);
+    setNotice(null);
     if (!inputVal) return;
 
     const inputDate = new Date(inputVal);
@@ -98,19 +101,18 @@ export default function Home() {
 
     const diffTime = today.getTime() - lmpDate.getTime();
     const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
+    const isFuture = diffDays < 0;
 
-    if (diffDays < 0) {
-      setError(
+    if (isFuture) {
+      setNotice(
           currentMode === 'period'
-              ? 'Der Tag der letzten Periode kann nicht in der Zukunft liegen.'
-              : 'Der eingegebene Entbindungstermin liegt zu weit in der Zukunft.'
+              ? 'Hinweis: Der Tag der letzten Periode liegt in der Zukunft. Die Fristen und Meilensteine wurden vorausberechnet.'
+              : 'Hinweis: Der Entbindungstermin liegt weit in der Zukunft. Die Fristen und Meilensteine wurden vorausberechnet.'
       );
-      setResult(null);
-      return;
     }
 
-    const currentWeeks = Math.floor(diffDays / 7);
-    const currentDays = diffDays % 7;
+    const currentWeeks = isFuture ? 0 : Math.floor(diffDays / 7);
+    const currentDays = isFuture ? 0 : diffDays % 7;
 
     const weeklyOverview: WeekDetail[] = Array.from({ length: 40 }, (_, i) => {
       const weekNum = i + 1;
@@ -124,7 +126,7 @@ export default function Home() {
         weekNumber: weekNum,
         startDate: start.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
         endDate: end.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-        isCurrent: weekNum === currentWeeks + 1,
+        isCurrent: !isFuture && weekNum === currentWeeks + 1,
       };
     });
 
@@ -137,7 +139,7 @@ export default function Home() {
     const checkups: CheckupDate[] = checkupWeeks.map((w) => ({
       week: w,
       date: formatDate(lmpDate, (w - 1) * 7),
-      isCurrent: (currentWeeks + 1) >= w && (currentWeeks + 1) < w + 2,
+      isCurrent: !isFuture && (currentWeeks + 1) >= w && (currentWeeks + 1) < w + 2,
     }));
 
     setResult({
@@ -151,12 +153,14 @@ export default function Home() {
       ogtt,
       us3,
       checkups,
+      isFuture,
     });
   };
 
   const handleModeChange = (newMode: 'period' | 'dueDate') => {
     setMode(newMode);
     setError(null);
+    setNotice(null);
     if (dateInput) {
       calculate(dateInput, newMode);
     }
@@ -212,14 +216,22 @@ export default function Home() {
                   value={dateInput}
                   onChange={(e) => setDateInput(e.target.value)}
                   onBlur={(e) => calculate(e.target.value, mode)}
-                  className="w-full max-w-full p-3 text-base border rounded-2xl focus:ring-2 focus:ring-rose-soft focus:border-transparent outline-none text-text-main bg-cream/50 box-border"
+                  className="w-full max-w-full p-3 text-base border border-mint rounded-2xl focus:ring-2 focus:ring-rose-soft focus:border-transparent outline-none text-text-main bg-cream/50 box-border"
               />
 
-              {/* Elegante Fehlermeldung */}
+              {/* Fehlermeldung (ungültiges Datum) */}
               {error && (
                   <div className="p-3.5 rounded-2xl bg-[#FDE2E4] border border-[#F4ACB7] text-[#9E2A2B] text-sm font-medium flex items-center gap-2.5 animate-fadeIn">
-                    <span className="text-base shrink-0">⚠️</span>
+                    <span className="text-base flex-shrink-0">⚠️</span>
                     <span>{error}</span>
+                  </div>
+              )}
+
+              {/* Hinweismeldung (Datum liegt in der Zukunft) */}
+              {notice && (
+                  <div className="p-3.5 rounded-2xl bg-[#E2ECE9] border border-[#B7D5C2] text-[#2D6A4F] text-sm font-medium flex items-center gap-2.5 animate-fadeIn">
+                    <span className="text-base flex-shrink-0">💡</span>
+                    <span>{notice}</span>
                   </div>
               )}
 
@@ -237,14 +249,18 @@ export default function Home() {
 
                   {/* Top Banner Status */}
                   <div className="bg-rose-bg border border-[#FFCAD4] p-5 rounded-3xl text-center shadow-sm w-full">
-                    <span className="text-base font-bold uppercase tracking-wider text-purple-dark">Aktueller Stand</span>
+                <span className="text-base font-bold uppercase tracking-wider text-purple-dark">
+                  {result.isFuture ? 'Geplante Schwangerschaft' : 'Aktueller Stand'}
+                </span>
                     <h2 className="text-2xl sm:text-4xl font-black text-rose-soft my-1">
-                      SSW {result.weeks} + {result.days}
+                      {result.isFuture ? 'SSW 0 + 0' : `SSW ${result.weeks} + ${result.days}`}
                     </h2>
                     <p className="text-base text-[#6C757D] font-medium">
-                      {result.weeks >= 40
-                          ? 'Der Geburtstermin ist erreicht oder überschritten.'
-                          : `Du bist in der ${result.weeks + 1}. Schwangerschaftswoche.`}
+                      {result.isFuture
+                          ? 'Die Schwangerschaft hat rechnerisch noch nicht begonnen.'
+                          : result.weeks >= 40
+                              ? 'Der Geburtstermin ist erreicht oder überschritten.'
+                              : `Du bist in der ${result.weeks + 1}. Schwangerschaftswoche.`}
                     </p>
                     <div className="border-t border-[#FFCAD4]/60 my-3" />
                     <p className="text-base font-medium text-text-main">
@@ -333,8 +349,8 @@ export default function Home() {
                           </button>
                         </div>
 
-                        <div className="space-y-2 lg:max-h-160 lg:overflow-y-auto lg:pr-1">
-                          {(showAllWeeks
+                        <div className="space-y-2 lg:max-h-[32rem] lg:overflow-y-auto lg:pr-1">
+                          {(showAllWeeks || result.isFuture
                                   ? result.weeklyOverview
                                   : result.weeklyOverview.filter(w => w.isCurrent || Math.abs(w.weekNumber - (result.weeks + 1)) <= 2)
                           ).map((w) => (
@@ -395,7 +411,7 @@ export default function Home() {
                         <div className="space-y-4">
                           {STAGES.map((stage, idx) => {
                             const currentWeek = result.weeks + 1;
-                            const isActive = currentWeek >= stage.weekMin && currentWeek <= stage.weekMax;
+                            const isActive = !result.isFuture && currentWeek >= stage.weekMin && currentWeek <= stage.weekMax;
 
                             return (
                                 <div
