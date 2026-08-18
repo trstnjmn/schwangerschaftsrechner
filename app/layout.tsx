@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import type { Viewport } from 'next'
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,6 +21,10 @@ export const metadata: Metadata = {
     apple: "/apple-icon.png",
   },
 };
+
+export const viewport: Viewport = {
+    themeColor: '#FAF7F1',
+}
 
 export default function RootLayout({
                                      children,
