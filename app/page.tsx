@@ -59,6 +59,7 @@ export default function Home() {
   const [mode, setMode] = useState<'period' | 'dueDate'>('period');
   const [dateInput, setDateInput] = useState<string>('');
   const [result, setResult] = useState<CalculationResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [showAllWeeks, setShowAllWeeks] = useState<boolean>(false);
   const [showTimelineMobile, setShowTimelineMobile] = useState<boolean>(false);
 
@@ -69,10 +70,15 @@ export default function Home() {
   };
 
   const calculate = (inputVal: string, currentMode: 'period' | 'dueDate') => {
+    setError(null);
     if (!inputVal) return;
 
     const inputDate = new Date(inputVal);
-    if (isNaN(inputDate.getTime())) return;
+    if (isNaN(inputDate.getTime())) {
+      setError('Bitte gib ein gültiges Datum ein.');
+      setResult(null);
+      return;
+    }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -94,7 +100,11 @@ export default function Home() {
     const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
 
     if (diffDays < 0) {
-      alert('Das berechnete Startdatum liegt in der Zukunft.');
+      setError(
+          currentMode === 'period'
+              ? 'Der Tag der letzten Periode kann nicht in der Zukunft liegen.'
+              : 'Der eingegebene Entbindungstermin liegt zu weit in der Zukunft.'
+      );
       setResult(null);
       return;
     }
@@ -102,7 +112,6 @@ export default function Home() {
     const currentWeeks = Math.floor(diffDays / 7);
     const currentDays = diffDays % 7;
 
-    // 40 Wochen Übersicht
     const weeklyOverview: WeekDetail[] = Array.from({ length: 40 }, (_, i) => {
       const weekNum = i + 1;
       const start = new Date(lmpDate);
@@ -119,13 +128,11 @@ export default function Home() {
       };
     });
 
-    // Med. Screenings
-    const us1 = { start: formatDate(lmpDate, 56), end: formatDate(lmpDate, 83) }; // 8+0 bis 11+6
-    const us2 = { start: formatDate(lmpDate, 126), end: formatDate(lmpDate, 153) }; // 18+0 bis 21+6
-    const ogtt = { start: formatDate(lmpDate, 168), end: formatDate(lmpDate, 196) }; // 24+0 bis 28+0
-    const us3 = { start: formatDate(lmpDate, 196), end: formatDate(lmpDate, 223) }; // 28+0 bis 31+6
+    const us1 = { start: formatDate(lmpDate, 56), end: formatDate(lmpDate, 83) };
+    const us2 = { start: formatDate(lmpDate, 126), end: formatDate(lmpDate, 153) };
+    const ogtt = { start: formatDate(lmpDate, 168), end: formatDate(lmpDate, 196) };
+    const us3 = { start: formatDate(lmpDate, 196), end: formatDate(lmpDate, 223) };
 
-    // Vorsorge alle 2 Wochen ab SSW 28 bis SSW 40 (ET)
     const checkupWeeks = [28, 30, 32, 34, 36, 38, 40];
     const checkups: CheckupDate[] = checkupWeeks.map((w) => ({
       week: w,
@@ -149,6 +156,7 @@ export default function Home() {
 
   const handleModeChange = (newMode: 'period' | 'dueDate') => {
     setMode(newMode);
+    setError(null);
     if (dateInput) {
       calculate(dateInput, newMode);
     }
@@ -158,7 +166,6 @@ export default function Home() {
       <main className="min-h-screen bg-cream py-6 px-3 sm:px-6 flex flex-col items-center overflow-x-hidden w-full">
         <div className="w-full max-w-md lg:max-w-6xl flex flex-col min-h-[calc(100vh-3rem)]">
 
-          {/* Content Wrapper */}
           <div className="space-y-6 flex-1">
             {/* Header */}
             <div className="text-center space-y-1">
@@ -205,8 +212,17 @@ export default function Home() {
                   value={dateInput}
                   onChange={(e) => setDateInput(e.target.value)}
                   onBlur={(e) => calculate(e.target.value, mode)}
-                  className="w-full max-w-full p-3 text-base border border-mint rounded-2xl focus:ring-2 focus:ring-rose-soft focus:border-transparent outline-none text-text-main bg-cream/50 box-border"
+                  className="w-full max-w-full p-3 text-base border rounded-2xl focus:ring-2 focus:ring-rose-soft focus:border-transparent outline-none text-text-main bg-cream/50 box-border"
               />
+
+              {/* Elegante Fehlermeldung */}
+              {error && (
+                  <div className="p-3.5 rounded-2xl bg-[#FDE2E4] border border-[#F4ACB7] text-[#9E2A2B] text-sm font-medium flex items-center gap-2.5 animate-fadeIn">
+                    <span className="text-base shrink-0">⚠️</span>
+                    <span>{error}</span>
+                  </div>
+              )}
+
               <button
                   type="submit"
                   className="w-full bg-purple-strong hover:bg-[#6A23A6] text-white font-bold py-3 rounded-2xl transition-all duration-200 active:scale-98 shadow-md text-base"
@@ -236,10 +252,10 @@ export default function Home() {
                     </p>
                   </div>
 
-                  {/* Main Content Layout: Screenings + Calendar Left, Embryo Right */}
+                  {/* Main Content Layout */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-                    {/* Left Column (Ultraschall, Termine & SSW Kalender) */}
+                    {/* Left Column */}
                     <div className="lg:col-span-6 space-y-6">
 
                       {/* Wichtige Ultraschall- & Testtermine */}
@@ -304,7 +320,7 @@ export default function Home() {
                         </div>
                       </div>
 
-                      {/* SSW Kalenderübersicht (Kein Scroll-Container auf Mobile) */}
+                      {/* SSW Kalenderübersicht */}
                       <div className="bg-white p-4 sm:p-6 rounded-3xl shadow-sm border border-border-light w-full">
                         <div className="flex justify-between items-center mb-4">
                           <h3 className="text-base sm:text-lg font-bold text-text-main">SSW Kalenderübersicht</h3>
@@ -317,8 +333,7 @@ export default function Home() {
                           </button>
                         </div>
 
-                        {/* Auf Mobile normales Fließen ohne Container-Scrollbar */}
-                        <div className="space-y-2 lg:max-h-[32rem] lg:overflow-y-auto lg:pr-1">
+                        <div className="space-y-2 lg:max-h-160 lg:overflow-y-auto lg:pr-1">
                           {(showAllWeeks
                                   ? result.weeklyOverview
                                   : result.weeklyOverview.filter(w => w.isCurrent || Math.abs(w.weekNumber - (result.weeks + 1)) <= 2)
@@ -347,7 +362,7 @@ export default function Home() {
 
                     </div>
 
-                    {/* Right Column (Embryo Entwicklung - Auf Desktop immer ausgeklappt & Nebeneinander) */}
+                    {/* Right Column (Entwicklung deines Babys) */}
                     <div className="lg:col-span-6 bg-white p-4 sm:p-6 rounded-3xl shadow-sm border border-border-light w-full">
 
                       {/* Mobile Header Toggle */}
@@ -358,7 +373,7 @@ export default function Home() {
                             className="w-full flex justify-between items-center text-left focus:outline-none"
                         >
                           <div>
-                            <h3 className="text-base font-bold text-text-main">Status des Embryos & Entwicklung</h3>
+                            <h3 className="text-base font-bold text-text-main">Entwicklung deines Babys</h3>
                             <p className="text-xs text-text-sub mt-0.5">
                               {showTimelineMobile ? 'Tippen zum Einklappen' : 'Tippen zum Ausklappen'}
                             </p>
@@ -371,11 +386,11 @@ export default function Home() {
 
                       {/* Desktop Header */}
                       <div className="hidden lg:block mb-4 border-b border-border-light pb-3">
-                        <h3 className="text-lg font-bold text-text-main">Entwicklungsverlauf</h3>
-                        <p className="text-sm text-text-sub">Übersicht der wichtigsten Entwicklungen</p>
+                        <h3 className="text-lg font-bold text-text-main">Entwicklung deines Babys</h3>
+                        <p className="text-sm text-text-sub">Wichtige Entwicklungsphasen im Überblick</p>
                       </div>
 
-                      {/* Content Container (Mobile conditional / Desktop permanent) */}
+                      {/* Content Container */}
                       <div className={`mt-4 lg:mt-0 ${showTimelineMobile ? 'block' : 'hidden lg:block'}`}>
                         <div className="space-y-4">
                           {STAGES.map((stage, idx) => {
@@ -391,10 +406,7 @@ export default function Home() {
                                             : 'bg-white border-[#F8F9FA]'
                                     }`}
                                 >
-                                  {/* Nebeneinander-Layout für Zeitstrahl/Phase & Entwicklung */}
                                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 items-start">
-
-                                    {/* Zeitstrahl/Badge Spalte */}
                                     <div className="sm:col-span-5 flex flex-col items-start gap-1">
                                 <span className={`inline-block text-xs font-bold px-2.5 py-1 rounded-full ${stage.badgeBg} ${stage.badgeText}`}>
                                   SSW {stage.weekMin} – {stage.weekMax}
@@ -402,11 +414,9 @@ export default function Home() {
                                       <h4 className="text-base font-bold text-text-main leading-snug mt-1">{stage.label}</h4>
                                     </div>
 
-                                    {/* Beschreibung Spalte */}
                                     <div className="sm:col-span-7">
                                       <p className="text-sm text-[#6C757D] leading-relaxed">{stage.desc}</p>
                                     </div>
-
                                   </div>
                                 </div>
                             );
